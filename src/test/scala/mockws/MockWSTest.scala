@@ -7,7 +7,7 @@ import org.mockito.Mockito._
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.Json
-import play.api.libs.ws.{WSAuthScheme, WSResponse, WSSignatureCalculator}
+import play.api.libs.ws.{EmptyBody, WSAuthScheme, WSResponse, WSSignatureCalculator}
 import play.api.mvc.Result
 import play.api.mvc.Results._
 import play.api.test.Helpers._
@@ -59,6 +59,16 @@ class MockWSTest extends FunSuite with Matchers with PropertyChecks {
       case (GET, "/blah") => Action { request => Ok(request.method)}
     }
     await(ws.url("/blah").get()).status shouldEqual OK
+    ws.close()
+  }
+
+  test("mock WS works with empty body") {
+    // Issue #40 - real world exampe with content-type: application/json but with empty body
+    // See compacting CouchDB http://docs.couchdb.org/en/stable/api/database/compact.html
+    val ws = MockWS {
+      case (POST, "/books/_compact") => Action { request => Ok(request.method)}
+    }
+    await(ws.url("/books/_compact").withHttpHeaders(CONTENT_TYPE -> "application/json").post(EmptyBody)).status shouldEqual OK
     ws.close()
   }
 
@@ -234,14 +244,14 @@ class MockWSTest extends FunSuite with Matchers with PropertyChecks {
       case (PUT, "/put")       => Action { Ok("put ok") }
       case (DELETE, "/delete") => Action { Ok("delete ok") }
     }
-    
+
     await(ws.url("/get").withMethod("GET").execute()).body       shouldEqual "get ok"
     await(ws.url("/post").withMethod("POST").execute()).body     shouldEqual "post ok"
     await(ws.url("/put").withMethod("PUT").execute()).body       shouldEqual "put ok"
     await(ws.url("/delete").withMethod("DELETE").execute()).body shouldEqual "delete ok"
     ws.close()
   }
-  
+
   test("should not raise NullPointerExceptions on method chaining") {
     val ws = MockWS {
       case (GET, "/get") => Action { Ok("get ok") }
